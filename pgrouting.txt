@@ -1,0 +1,305 @@
+/*Add shp files*/
+
+/* Create a table wiy */
+CREATE TABLE roads AS
+SELECT gid,
+      (ST_Dump(geom)).geom AS the_geom
+FROM strade_asl8;
+
+/* Add columns source and target */
+ALTER TABLE roads ADD COLUMN source int4;
+ALTER TABLE roads ADD COLUMN target int4;     
+
+/* Force the geometries into a "2-dimensional mode" */
+UPDATE roads SET the_geom = ST_Force2D(the_geom)
+
+/* Create topology */
+SELECT pgr_createTopology('roads', 0.00001,'the_geom','gid','source','target');
+
+/* Create nearest nodes table */
+CREATE TABLE nearest_vertices AS (
+SELECT 
+   DISTINCT ON (defibrilatori.gid) 
+   defibrilatori.gid AS dae_id, vertices.id AS node_id, ST_Distance(vertices.the_geom, defibrilatori.geom) AS distance , vertices.the_geom  as dist
+FROM roads_vertices_pgr AS vertices, dae_asl8 AS defibrilatori  
+-- WHERE ST_DWithin(defibrilatori.geom, vertices.the_geom, 250)
+-- WHERE defibrilatori.gid IN (SELECT gid FROM dae_asl8) 
+ORDER BY dae_id ASC, distance ASC, node_id ASC); -- GROUP BY dae_id, distance;
+
+/* create the "cost" column in roads */
+ALTER TABLE roads ADD COLUMN cost float4;
+
+/*set the cost for each node */
+UPDATE roads SET cost = (SELECT ST_distance (ST_startpoint(the_geom), ST_endpoint(the_geom)));
+
+/* --------------All points -------------------------------------------*/
+
+/* Driving Distance From Multiple Starting Vertex. *Returns set/table of ids (seq [, start_v], node, edge, cost, agg_cost) **node: Identifier of the node in the path within the limits from start_vid. */
+CREATE TABLE ddistance AS (SELECT * FROM pgr_drivingDistance('SELECT  gid as id, source, target, cost
+FROM roads',
+      array[954,424,52615,57235,27665,43204,36772,57241,49537,9745,57244,47970,6000,19393,2382,47966,27792,18277,19565,37268,35915,25667,45720,50429,54944,12192,7579,1725,17168,26274,29834,8401,44960,44621,29636,15605,9093,53034,39000,34092,38830,31759,57279,21616,1,1,1,36644,2156,11670,1045,10774,44591,22083,53975,15042,51857,9152,11187,9152,1124,15216,21657,40103,25940,14597,36776,1501,4869,3034,11775,18202,9268,40467,4603,19002,30953,41210,56821,17312,8145,11274,17464,3859,37075,39892,40988,38079,3042,5825,2977,1246,21436,54567,27403,24345,4434,23736,23729,33753,2778,54567,13139,30199,29397,15053,49025,32408,32408,17096,32361,21876,17096,26839,50615,51780,18479,28527,50243,55044,8850,37539,35469,31405,26538,51717,13567,11584,52298,52956,23739,29436,16657,6117,37209,14803,33449,48857,52452,8219,2348,27489,49551,7016,31656,15228,7738,16558,28298,4419,46035,54361,1028,3400,13259,56057,37335,2778,35847,5244,16137,36133,14505,12109,11919,7830,11475,19171,24655,2905,52330,1770,376,3178,5655,41139,30064,42502,2770,8239,3776,30015,19632,32166,51325,19564,56007,3684,35657,9744,53405,4427,52645,4195,4427,46581,21751,36578,14422,39050,12820,5212,7617,9346,42467,12056,4986,2218,49154,48358,26900,33059,12531,44010,38704,2608,10348,1178,23314,5469,5471,14534,2688,17070,18855,34669,28373,35975,8727,8390,20241,23772,45496,48350,33059,44236,43930,48210,27707,35351,25378,9412,33699,53416,27157,6954,17137,3214,16702,1424,35949,35707,9322,29815,23860,16723,35678,11417,4356,5285,26917,55307,35114,6104,52330,55675,4435,17834,4947,8397,15127,24309,34526,47676,3830,6337,13305,4924,7801,15387,12353,34364,18481,5346,35569,50141,36012,1329,36268,49715,27489,26419,4785,4734,43629,45905,45905,45408,24732,19926,56564,51017,57409,49115,53417,52956,18282,10560,2497,49440,2712,644,47232,34868,32193,23672,21029,56558,17138,3001,37380,49140,11254,40021,35590,22252,2431,4609,46531,47489,35975,26798,9322,54666,22015,1451,1451,1451,9538,39400,37272,5022,27746,33541,29274,15219,29268,31528,32047,28594,57432,41028,26416,14472,29383,14804,30581,12454,11436,39187,6015,22859,45357,21768,29264,54172,52476,34839,4349,38476,29785,16820,2569,34644,26797,34956,14533,39050,5039,33909,15117,37101,42093,48945,33711,33711,1302,39887,39569,39887,39887,39887,39887,43284,34841,53863,23185,44965,39444,39036,16194,16194,11431,37661,50427,38590,6033,39061,52959,51729,6636,35652,8772,23444,32966,33517,14300,34064,5941,1,1,1461,11802,644,645,644,644,25764,16558,25736,19269,53390,36687,33082,51212,35882,18714,23948,46509,16666,37984,12730,55786,6418,40757,7089,7791,11130,10861,46233,43944,11803,44510,9865,25819,14414,23415,23415,35193,2079,8923,52779,43916,25262,15097,1671,33504,43040,33709,7106,1054,50732,32596,53804,17743,25946,53804,53804,53804,29464,53804,54951,53804,29098,53804,51627,45006,27052,32069,31304,2789,33184,26941,31428,44681,53883,37574,19368,49984,51949,5597,25536,13794,14006,33217,31401,39423,23367,54072,28950,51264,46497,40979,44992,34823,51610,12108,4005,32895,15622,30949,41242,45867,30893,35298,46157,32210,3260,16833,50852,46179,25072,27960,8010,30305,14397,29426,15707,30603,33567,5883,33010,23398,32035,40188,33240,16131,32172,4341,45419,26173,45390,46649,21507,51725,32927,31404,46377,40217,6399,15074,54031,35926,30059,2997,33673,937,24019,29534,45253,36343,35583,5019,36675,51874,50534,36734,49082,2044,57382,1576,2798,39839,16558,47806,47818,4037,44333,40031,12683,8815,2767,56995,1238,1239,22460,10512,39918,32296,25554,41237,23967,41915,6262,2739,11993,12161,51726,5081,21436,49801,44264,25988,6,21171,54485,33711,55265,33510,52814,56822,25761,37450,18166,18673,8103,5652,2348,41045,25120,21225,52362,4954,20222,1745,28985,44274,4885,44274,15100,14582,27979,49023,32564,2397],
+	  180, false
+      ));
+	  
+/* Other way using a loop  */
+--DROP FUNCTION driving_distance();
+--DROP TABLE ddistance;
+
+CREATE OR REPLACE FUNCTION driving_distance() returns void as
+$BODY$
+declare
+    node record;
+begin
+    raise notice 'calculating...';
+    create table ddistance (seq int, node int, edge int, cost float8, agg_cost float8);
+    for node in select node_id from nearest_vertices order by node_id ASC loop -- order by nearest_node loop
+        raise notice 'Processing node:  %', node.node_id ;
+        execute 'INSERT INTO ddistance (SELECT * FROM pgr_drivingDistance (
+		''SELECT gid as id, source, target, cost FROM roads'',
+		'|| node.node_id ||',
+                250,
+                false))';
+        raise notice 'inserted info of node: %', node.node_id ;
+    end loop;
+    return ;
+end
+$BODY$
+Language 'plpgsql' ;
+SELECT * FROM driving_distance();		  
+ 
+/*Join roads_vertices_pgr with ddistance to get the geometry of the points*/
+CREATE TABLE isopoints AS (SELECT from_v, node, cost, the_geom
+FROM roads_vertices_pgr
+INNER JOIN ddistance
+ON roads_vertices_pgr.id=ddistance.node);
+	  
+/* Create table of vertex (points xy) that form the isocrone in a "driving distance" of 250 m*/
+--CREATE TABLE isovertex AS (SELECT x,y FROM pgr_alphaShape(
+--'SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
+--FROM isopoints'
+--));	  
+
+/* Create several tables of vertices (points xy) that form the different isocrones in a "driving distance" of 250 m*/
+CREATE OR REPLACE FUNCTION isovertex() returns void as
+$BODY$
+declare
+    vertex record;
+    -- secteur geometry ;
+begin
+    raise notice 'calculating...';
+    for vertex in select from_v from isopoints group by from_v order by from_v ASC 
+    loop 
+    begin
+        raise notice 'Processing node:  %', vertex.from_v ;
+        --execute 'select geom from sectorisations as foo where ST_Contains (foo.geom,$1)' into secteur using node.geom ;
+        execute 'CREATE TABLE isovertex_'||vertex.from_v||' as (SELECT x,y FROM pgr_alphaShape(
+				''SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
+				  FROM isopoints WHERE isopoints.from_v = '||vertex.from_v||' ''))';
+	execute 'ALTER TABLE isovertex_'||vertex.from_v||' ADD id SERIAL';
+     exception	
+	when SQLstate 'XX000' then 
+		execute 'DELETE FROM isopoints  WHERE from_v = '||vertex.from_v||'';
+		execute 'raise notice ''Deleting node...''';
+     end;
+     end loop;
+    return ;
+end
+$BODY$
+Language 'plpgsql' ;
+SELECT * FROM isovertex();
+
+
+/* Create index table*/ 
+
+CREATE TABLE public.indice
+(
+   id integer, 
+   "name" character varying
+) 
+WITH (
+  OIDS = FALSE
+)
+;
+
+/* create table of deleted vertices */
+CREATE TABLE public.delvertex
+(
+   id bigint
+) 
+WITH (
+  OIDS = FALSE
+)
+;
+
+/* Opzione 2: Create several tables of vertices (points xy) that form the different isocrones in a "driving distance" of 250 m*/
+
+CREATE OR REPLACE FUNCTION isovertex() returns void as
+$BODY$
+declare
+    vertex record;
+    -- secteur geometry ;
+begin
+    raise notice 'calculating...';
+    for vertex in select from_v from isopoints group by from_v order by from_v ASC 
+    loop 
+    begin
+        raise notice 'Processing node:  %', vertex.from_v ;
+        --execute 'select geom from sectorisations as foo where ST_Contains (foo.geom,$1)' into secteur using node.geom ;
+        execute 'CREATE TABLE iso_'||vertex.from_v||' as (SELECT x,y FROM pgr_alphaShape(
+				''SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
+				  FROM isopoints WHERE isopoints.from_v = '||vertex.from_v||' ''))';
+	    execute 'ALTER TABLE iso_'||vertex.from_v||' ADD id SERIAL';
+		execute 'ALTER TABLE iso_'||vertex.from_v||' ADD COLUMN the_geom public.geometry';
+		execute 'UPDATE iso_'||vertex.from_v||' SET the_geom =  ST_MakePoint(x,y)';
+	    execute 'INSERT INTO index (id, name) VALUES ('||vertex.from_v||', 'isovertex_''||vertex.from_v||')';
+     exception	
+	when SQLstate 'XX000' then 
+		execute 'DELETE FROM isopoints  WHERE from_v = '||vertex.from_v||'';
+		execute 'INSERT INTO delvertex (id) VALUES ('||vertex.from_v||')';
+		execute 'raise notice ''Deleting node...''';
+     end;
+     end loop;
+    return ;
+end
+$BODY$
+Language 'plpgsql' ;
+SELECT * FROM isovertex();
+
+
+-- viene fuori un errore: "less than 3 vertices. Alpha shape calculation needs at least 3 vertices"  
+--[8239,8401,8923,9745,9865,11187,11431,11584,11670, 12353, 12683, 14006, 14300, 14414, 14422, 15042, 15216, 17743, 17834, 18479, 18481, 19002, 19926, 21171, 21225, 21657, 21876, 22015, 22083, 23314, 23398, 23672, 23948, 25120, 25536, 25667, 25988, 26538, 27489, 27979, 28298, 29436, 29464, 29636, 29834, 30199, 30305, 30581, 30949, 31528, 31759, 32047, 32296, 32361, 32408, 32564, 33517, 33709, 34092, 34364, 34526, 34644]
+DELETE FROM isopoints
+  WHERE from_v = 11431;
+ 
+ 
+ 
+
+/* eliminate nulls*/ 
+
+CREATE OR REPLACE FUNCTION valnull() returns void as
+$BODY$
+declare
+    riga record;
+    -- secteur geometry ;
+begin
+    for riga in select id from indice 
+    loop 
+        execute 'DELETE FROM i_'||riga.id||'  WHERE x is null';
+    end loop;
+    return ;
+end
+$BODY$
+Language 'plpgsql' ;
+SELECT * FROM valnull();
+ 
+ 
+ 
+ 
+/* Draws all alpha shape around given set of points in a unique table*/ DA FARE
+
+CREATE TABLE public.isocrone
+(
+   geom public.geometry
+) 
+WITH (
+  OIDS = FALSE
+)
+;
+
+
+CREATE OR REPLACE FUNCTION isocrone() returns void as
+$BODY$
+declare
+    riga record;
+    -- secteur geometry ;
+begin
+    --raise notice 'calculating...';
+    for riga in select id from indice 
+    loop 
+ 	execute 'INSERT INTO isocrone SELECT pgr_pointsAsPolygon(''SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y FROM iso_'||riga.id||''')';
+    end loop;
+    return ;
+end
+$BODY$
+Language 'plpgsql' ;
+SELECT * FROM isocrone();
+
+/*Join roads_vertices_pgr with indice to get the geometry of the points*/
+CREATE TABLE dae_iso AS (SELECT id, the_geom
+FROM roads_vertices_pgr
+INNER JOIN indice
+ON roads_vertices_pgr.id=indice.id);
+
+/*Join roads_vertices_pgr with indice to get the geometry of the points*/
+CREATE TABLE eliminati AS (SELECT id, the_geom
+FROM roads_vertices_pgr
+INNER JOIN delvertex
+ON roads_vertices_pgr.id=delvertex.gid);
+
+
+
+/* --------------Test for just one point (id 15) ----------------------*/
+
+/* Driving Distance From A Single Starting Vertex. *Returns set/table of ids (seq [, start_v], node, edge, cost, agg_cost) **node: Identifier of the node in the path within the limits from start_vid.*/
+CREATE TABLE ddistance AS (SELECT * FROM pgr_drivingDistance('SELECT  gid as id, source, target, cost
+FROM roads',
+      15, 75, false
+      ));
+
+/*Join roads_vertices_pgr with ddistance to get the geometry of the points*/
+CREATE TABLE isopoints AS (SELECT *
+FROM roads_vertices_pgr
+INNER JOIN ddistance
+ON roads_vertices_pgr.id=ddistance.node);
+
+/* Create table of vertex (points xy) that form the isocrone in a "driving distance" of 250 m*/
+CREATE TABLE isovertex AS (SELECT x,y FROM pgr_alphaShape(
+'SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
+FROM isopoints'
+));
+
+
+/* Create an id column in the vertex table */
+ALTER TABLE isovertex ADD id SERIAL;
+ALTER TABLE isovertex ADD PRIMARY KEY (id);
+
+/* add eometry column to isovertex */
+ALTER TABLE public.isovertex
+   ADD COLUMN the_geom public.geometry;
+UPDATE isovertex SET the_geom =  ST_MakePoint(x,y)
+
+/* creates Draws an alpha shape around given set of points */
+CREATE TABLE isocrone AS (SELECT pgr_pointsAsPolygon ('SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
+FROM isopoints');
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
