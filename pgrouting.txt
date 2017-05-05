@@ -1,279 +1,145 @@
-/*Add shp files*/
-
-/* Create a table wiy */
-CREATE TABLE roads AS
-SELECT gid,
-      (ST_Dump(geom)).geom AS the_geom
-FROM strade_asl8;
-
-/* Add columns source and target */
-ALTER TABLE roads ADD COLUMN source int4;
-ALTER TABLE roads ADD COLUMN target int4;     
-
-/* Force the geometries into a "2-dimensional mode" */
-UPDATE roads SET the_geom = ST_Force2D(the_geom)
-
-/* Create topology */
-SELECT pgr_createTopology('roads', 0.00001,'the_geom','gid','source','target');
-
-/* Create nearest nodes table */
-CREATE TABLE nearest_vertices AS (
-SELECT 
-   DISTINCT ON (defibrilatori.gid) 
-   defibrilatori.gid AS dae_id, vertices.id AS node_id, ST_Distance(vertices.the_geom, defibrilatori.geom) AS distance , vertices.the_geom  as dist
-FROM roads_vertices_pgr AS vertices, dae_asl8 AS defibrilatori  
--- WHERE ST_DWithin(defibrilatori.geom, vertices.the_geom, 250)
--- WHERE defibrilatori.gid IN (SELECT gid FROM dae_asl8) 
-ORDER BY dae_id ASC, distance ASC, node_id ASC); -- GROUP BY dae_id, distance;
-
-/* create the "cost" column in roads */
-ALTER TABLE roads ADD COLUMN cost float4;
-
-/*set the cost for each node */
-UPDATE roads SET cost = (SELECT ST_distance (ST_startpoint(the_geom), ST_endpoint(the_geom)));
-
-/* --------------All points -------------------------------------------*/
-
-/* Driving Distance From Multiple Starting Vertex. *Returns set/table of ids (seq [, start_v], node, edge, cost, agg_cost) **node: Identifier of the node in the path within the limits from start_vid. */
-CREATE TABLE ddistance AS (SELECT * FROM pgr_drivingDistance('SELECT  gid as id, source, target, cost
-FROM roads',
-      array[954,424,52615,57235,27665,43204,36772,57241,49537,9745,57244,47970,6000,19393,2382,47966,27792,18277,19565,37268,35915,25667,45720,50429,54944,12192,7579,1725,17168,26274,29834,8401,44960,44621,29636,15605,9093,53034,39000,34092,38830,31759,57279,21616,1,1,1,36644,2156,11670,1045,10774,44591,22083,53975,15042,51857,9152,11187,9152,1124,15216,21657,40103,25940,14597,36776,1501,4869,3034,11775,18202,9268,40467,4603,19002,30953,41210,56821,17312,8145,11274,17464,3859,37075,39892,40988,38079,3042,5825,2977,1246,21436,54567,27403,24345,4434,23736,23729,33753,2778,54567,13139,30199,29397,15053,49025,32408,32408,17096,32361,21876,17096,26839,50615,51780,18479,28527,50243,55044,8850,37539,35469,31405,26538,51717,13567,11584,52298,52956,23739,29436,16657,6117,37209,14803,33449,48857,52452,8219,2348,27489,49551,7016,31656,15228,7738,16558,28298,4419,46035,54361,1028,3400,13259,56057,37335,2778,35847,5244,16137,36133,14505,12109,11919,7830,11475,19171,24655,2905,52330,1770,376,3178,5655,41139,30064,42502,2770,8239,3776,30015,19632,32166,51325,19564,56007,3684,35657,9744,53405,4427,52645,4195,4427,46581,21751,36578,14422,39050,12820,5212,7617,9346,42467,12056,4986,2218,49154,48358,26900,33059,12531,44010,38704,2608,10348,1178,23314,5469,5471,14534,2688,17070,18855,34669,28373,35975,8727,8390,20241,23772,45496,48350,33059,44236,43930,48210,27707,35351,25378,9412,33699,53416,27157,6954,17137,3214,16702,1424,35949,35707,9322,29815,23860,16723,35678,11417,4356,5285,26917,55307,35114,6104,52330,55675,4435,17834,4947,8397,15127,24309,34526,47676,3830,6337,13305,4924,7801,15387,12353,34364,18481,5346,35569,50141,36012,1329,36268,49715,27489,26419,4785,4734,43629,45905,45905,45408,24732,19926,56564,51017,57409,49115,53417,52956,18282,10560,2497,49440,2712,644,47232,34868,32193,23672,21029,56558,17138,3001,37380,49140,11254,40021,35590,22252,2431,4609,46531,47489,35975,26798,9322,54666,22015,1451,1451,1451,9538,39400,37272,5022,27746,33541,29274,15219,29268,31528,32047,28594,57432,41028,26416,14472,29383,14804,30581,12454,11436,39187,6015,22859,45357,21768,29264,54172,52476,34839,4349,38476,29785,16820,2569,34644,26797,34956,14533,39050,5039,33909,15117,37101,42093,48945,33711,33711,1302,39887,39569,39887,39887,39887,39887,43284,34841,53863,23185,44965,39444,39036,16194,16194,11431,37661,50427,38590,6033,39061,52959,51729,6636,35652,8772,23444,32966,33517,14300,34064,5941,1,1,1461,11802,644,645,644,644,25764,16558,25736,19269,53390,36687,33082,51212,35882,18714,23948,46509,16666,37984,12730,55786,6418,40757,7089,7791,11130,10861,46233,43944,11803,44510,9865,25819,14414,23415,23415,35193,2079,8923,52779,43916,25262,15097,1671,33504,43040,33709,7106,1054,50732,32596,53804,17743,25946,53804,53804,53804,29464,53804,54951,53804,29098,53804,51627,45006,27052,32069,31304,2789,33184,26941,31428,44681,53883,37574,19368,49984,51949,5597,25536,13794,14006,33217,31401,39423,23367,54072,28950,51264,46497,40979,44992,34823,51610,12108,4005,32895,15622,30949,41242,45867,30893,35298,46157,32210,3260,16833,50852,46179,25072,27960,8010,30305,14397,29426,15707,30603,33567,5883,33010,23398,32035,40188,33240,16131,32172,4341,45419,26173,45390,46649,21507,51725,32927,31404,46377,40217,6399,15074,54031,35926,30059,2997,33673,937,24019,29534,45253,36343,35583,5019,36675,51874,50534,36734,49082,2044,57382,1576,2798,39839,16558,47806,47818,4037,44333,40031,12683,8815,2767,56995,1238,1239,22460,10512,39918,32296,25554,41237,23967,41915,6262,2739,11993,12161,51726,5081,21436,49801,44264,25988,6,21171,54485,33711,55265,33510,52814,56822,25761,37450,18166,18673,8103,5652,2348,41045,25120,21225,52362,4954,20222,1745,28985,44274,4885,44274,15100,14582,27979,49023,32564,2397],
-	  180, false
-      ));
-	  
-/* Other way using a loop  */
---DROP FUNCTION driving_distance();
---DROP TABLE ddistance;
-
-CREATE OR REPLACE FUNCTION driving_distance() returns void as
-$BODY$
-declare
-    node record;
-begin
-    raise notice 'calculating...';
-    create table ddistance (seq int, node int, edge int, cost float8, agg_cost float8);
-    for node in select node_id from nearest_vertices order by node_id ASC loop -- order by nearest_node loop
-        raise notice 'Processing node:  %', node.node_id ;
-        execute 'INSERT INTO ddistance (SELECT * FROM pgr_drivingDistance (
-		''SELECT gid as id, source, target, cost FROM roads'',
-		'|| node.node_id ||',
-                250,
-                false))';
-        raise notice 'inserted info of node: %', node.node_id ;
-    end loop;
-    return ;
-end
-$BODY$
-Language 'plpgsql' ;
-SELECT * FROM driving_distance();		  
- 
-/*Join roads_vertices_pgr with ddistance to get the geometry of the points*/
-CREATE TABLE isopoints AS (SELECT from_v, node, cost, the_geom
-FROM roads_vertices_pgr
-INNER JOIN ddistance
-ON roads_vertices_pgr.id=ddistance.node);
-	  
-/* Create table of vertex (points xy) that form the isocrone in a "driving distance" of 250 m*/
---CREATE TABLE isovertex AS (SELECT x,y FROM pgr_alphaShape(
---'SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
---FROM isopoints'
---));	  
-
-/* Create several tables of vertices (points xy) that form the different isocrones in a "driving distance" of 250 m*/
-CREATE OR REPLACE FUNCTION isovertex() returns void as
-$BODY$
-declare
-    vertex record;
-    -- secteur geometry ;
-begin
-    raise notice 'calculating...';
-    for vertex in select from_v from isopoints group by from_v order by from_v ASC 
-    loop 
-    begin
-        raise notice 'Processing node:  %', vertex.from_v ;
-        --execute 'select geom from sectorisations as foo where ST_Contains (foo.geom,$1)' into secteur using node.geom ;
-        execute 'CREATE TABLE isovertex_'||vertex.from_v||' as (SELECT x,y FROM pgr_alphaShape(
-				''SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
-				  FROM isopoints WHERE isopoints.from_v = '||vertex.from_v||' ''))';
-	execute 'ALTER TABLE isovertex_'||vertex.from_v||' ADD id SERIAL';
-     exception	
-	when SQLstate 'XX000' then 
-		execute 'DELETE FROM isopoints  WHERE from_v = '||vertex.from_v||'';
-		execute 'raise notice ''Deleting node...''';
-     end;
-     end loop;
-    return ;
-end
-$BODY$
-Language 'plpgsql' ;
-SELECT * FROM isovertex();
-
-
-/* Create index table*/ 
-
-CREATE TABLE public.indice
-(
-   id integer, 
-   "name" character varying
-) 
-WITH (
-  OIDS = FALSE
-)
-;
-
-/* create table of deleted vertices */
-CREATE TABLE public.delvertex
-(
-   id bigint
-) 
-WITH (
-  OIDS = FALSE
-)
-;
-
-/* Opzione 2: Create several tables of vertices (points xy) that form the different isocrones in a "driving distance" of 250 m*/
-
-CREATE OR REPLACE FUNCTION isovertex() returns void as
-$BODY$
-declare
-    vertex record;
-    -- secteur geometry ;
-begin
-    raise notice 'calculating...';
-    for vertex in select from_v from isopoints group by from_v order by from_v ASC 
-    loop 
-    begin
-        raise notice 'Processing node:  %', vertex.from_v ;
-        --execute 'select geom from sectorisations as foo where ST_Contains (foo.geom,$1)' into secteur using node.geom ;
-        execute 'CREATE TABLE iso_'||vertex.from_v||' as (SELECT x,y FROM pgr_alphaShape(
-				''SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
-				  FROM isopoints WHERE isopoints.from_v = '||vertex.from_v||' ''))';
-	    execute 'ALTER TABLE iso_'||vertex.from_v||' ADD id SERIAL';
-		execute 'ALTER TABLE iso_'||vertex.from_v||' ADD COLUMN the_geom public.geometry';
-		execute 'UPDATE iso_'||vertex.from_v||' SET the_geom =  ST_MakePoint(x,y)';
-	    execute 'INSERT INTO index (id, name) VALUES ('||vertex.from_v||', 'isovertex_''||vertex.from_v||')';
-     exception	
-	when SQLstate 'XX000' then 
-		execute 'DELETE FROM isopoints  WHERE from_v = '||vertex.from_v||'';
-		execute 'INSERT INTO delvertex (id) VALUES ('||vertex.from_v||')';
-		execute 'raise notice ''Deleting node...''';
-     end;
-     end loop;
-    return ;
-end
-$BODY$
-Language 'plpgsql' ;
-SELECT * FROM isovertex();
-
-
--- viene fuori un errore: "less than 3 vertices. Alpha shape calculation needs at least 3 vertices"  
---[8239,8401,8923,9745,9865,11187,11431,11584,11670, 12353, 12683, 14006, 14300, 14414, 14422, 15042, 15216, 17743, 17834, 18479, 18481, 19002, 19926, 21171, 21225, 21657, 21876, 22015, 22083, 23314, 23398, 23672, 23948, 25120, 25536, 25667, 25988, 26538, 27489, 27979, 28298, 29436, 29464, 29636, 29834, 30199, 30305, 30581, 30949, 31528, 31759, 32047, 32296, 32361, 32408, 32564, 33517, 33709, 34092, 34364, 34526, 34644]
-DELETE FROM isopoints
-  WHERE from_v = 11431;
- 
- 
- 
-
-/* eliminate nulls*/ 
-
-CREATE OR REPLACE FUNCTION valnull() returns void as
-$BODY$
-declare
-    riga record;
-    -- secteur geometry ;
-begin
-    for riga in select id from indice 
-    loop 
-        execute 'DELETE FROM i_'||riga.id||'  WHERE x is null';
-    end loop;
-    return ;
-end
-$BODY$
-Language 'plpgsql' ;
-SELECT * FROM valnull();
- 
- 
- 
- 
-/* Draws all alpha shape around given set of points in a unique table*/ DA FARE
-
-CREATE TABLE public.isocrone
-(
-   geom public.geometry
-) 
-WITH (
-  OIDS = FALSE
-)
-;
-
-
-CREATE OR REPLACE FUNCTION isocrone() returns void as
-$BODY$
-declare
-    riga record;
-    -- secteur geometry ;
-begin
-    --raise notice 'calculating...';
-    for riga in select id from indice 
-    loop 
- 	execute 'INSERT INTO isocrone SELECT pgr_pointsAsPolygon(''SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y FROM iso_'||riga.id||''')';
-    end loop;
-    return ;
-end
-$BODY$
-Language 'plpgsql' ;
-SELECT * FROM isocrone();
-
-/*Join roads_vertices_pgr with indice to get the geometry of the points*/
-CREATE TABLE dae_iso AS (SELECT id, the_geom
-FROM roads_vertices_pgr
-INNER JOIN indice
-ON roads_vertices_pgr.id=indice.id);
-
-/*Join roads_vertices_pgr with indice to get the geometry of the points*/
-CREATE TABLE eliminati AS (SELECT id, the_geom
-FROM roads_vertices_pgr
-INNER JOIN delvertex
-ON roads_vertices_pgr.id=delvertex.gid);
-
-
-
-/* --------------Test for just one point (id 15) ----------------------*/
-
-/* Driving Distance From A Single Starting Vertex. *Returns set/table of ids (seq [, start_v], node, edge, cost, agg_cost) **node: Identifier of the node in the path within the limits from start_vid.*/
-CREATE TABLE ddistance AS (SELECT * FROM pgr_drivingDistance('SELECT  gid as id, source, target, cost
-FROM roads',
-      15, 75, false
-      ));
-
-/*Join roads_vertices_pgr with ddistance to get the geometry of the points*/
-CREATE TABLE isopoints AS (SELECT *
-FROM roads_vertices_pgr
-INNER JOIN ddistance
-ON roads_vertices_pgr.id=ddistance.node);
-
-/* Create table of vertex (points xy) that form the isocrone in a "driving distance" of 250 m*/
-CREATE TABLE isovertex AS (SELECT x,y FROM pgr_alphaShape(
-'SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
-FROM isopoints'
-));
-
-
-/* Create an id column in the vertex table */
-ALTER TABLE isovertex ADD id SERIAL;
-ALTER TABLE isovertex ADD PRIMARY KEY (id);
-
-/* add eometry column to isovertex */
-ALTER TABLE public.isovertex
-   ADD COLUMN the_geom public.geometry;
-UPDATE isovertex SET the_geom =  ST_MakePoint(x,y)
-
-/* creates Draws an alpha shape around given set of points */
-CREATE TABLE isocrone AS (SELECT pgr_pointsAsPolygon ('SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y 
-FROM isopoints');
--------------------------------------------------------------------------------------------------------------------------------------
-
-
+1.	/******************************  
+2.	** File:   isocrone.sql   
+3.	** Name: Creazione di isocrone temporali con Pgrouting   
+4.	** Desc: Codice SQL utilizzato per la creazione delle isocrone, in questo script per le isocrone con velocità 1.5 m/s in 2 minuti.  
+5.	** Auth: Carolina Arias Munoz, Giulia Marelli  
+6.	** Date: 4/4/2017  
+7.	** libraries: Pgrouting version 2.3, PostGIS version 2.3.2.  
+8.	*******************************  
+9.	**Variables:   
+10.	*strade_asl8 (roads),   
+11.	*defibrilatori (defibrilators)  
+12.	  
+13.	/* Create a new table for the roads, using ST_Dump, that transform multi geometries to single geometries. This was done specifically for these types of data. Check if your data have multi geometries */  
+14.	CREATE TABLE roads AS  
+15.	    SELECT gid,  
+16.	      (ST_Dump(geom)).geom AS the_geom  
+17.	    FROM strade_asl8;  
+18.	  
+19.	/* Add columns source and target to table roads */  
+20.	ALTER TABLE roads ADD COLUMN source int4;  
+21.	ALTER TABLE roads ADD COLUMN target int4;     
+22.	    
+23.	/* Force the geometries into a "2-dimensional mode" with ST_Force2D */  
+24.	UPDATE roads SET the_geom = ST_Force2D(the_geom);  
+25.	  
+26.	/* Create topology for the roads layer*/  
+27.	SELECT pgr_createTopology('roads', 0.00001,'the_geom','gid','source','target');  
+28.	  
+29.	/* Create nearest nodes table: associate each defibrillator to the nearest node */  
+30.	CREATE TABLE nearest_vertices AS (  
+31.	    SELECT   
+32.	        DISTINCT ON (defibrilatori.gid)   
+33.	        defibrilatori.gid AS dae_id, vertices.id AS node_id, ST_Distance(vertices.the_geom, defibrilatori.geom) AS distance , vertices.the_geom  as dist  
+34.	    FROM roads_vertices_pgr AS vertices, dae_asl8 AS defibrilatori    
+35.	ORDER BY dae_id ASC, distance ASC, node_id ASC); -- GROUP BY dae_id, distance;  
+36.	  
+37.	/* create the "cost" column in roads */  
+38.	ALTER TABLE roads ADD COLUMN cost float4;  
+39.	  
+40.	/*set the cost for each node. For this case, the cost is the distance between the nodes */  
+41.	UPDATE roads SET cost = (SELECT ST_distance (ST_startpoint(the_geom), ST_endpoint(the_geom)));  
+42.	  
+43.	/* Driving Distance From Multiple Starting Vertex. *Returns set/table of ids (seq [, start_v], node, edge, cost, agg_cost) **node: Identifier of the node in the path within the limits from start_vid. Note: the nodes here where copied manually from table nearest vertices */  
+44.	CREATE TABLE ddistance AS (SELECT * FROM pgr_drivingDistance('SELECT  gid as id, source, target, cost  
+45.	FROM roads',   array[79062,27062,113524,18131,17517,51153,15949,115034,52637,143642,95000,56208,91517,103547,60864,78183,70823,135935,76961,21884,42183,80291,9538,48194,57340,77111,117476,105460,141985,140771,92143,124755,106388,48534,128491,9253,9357,86633,105145,60127,77018,31642,91653,134162,117459,121435,56439,139037,4825,68549,124944,15969,71721,119800,123499,82673,6049,73298,115796,8742,121299,60852,59903,59903,39182,91242,97711,86778,48374,147889,82885,95001,144496,15111,122716,120688,130292,97208,101755,31113,15885,133441,38719,55016,123395,54620,102680,20666,7146,47041,29513,31164,95115,90593,126813,127171,143409,27868,102086,21884,131018,13306,92368,92368,92368,97347,27810,142880,131123,87958,52618,56730,57843,105798,127848,146266,124631,56454,90305,50501,28002,115494,23694,133565,39965,111143,43957,42246,114820,126843,64171,15088,5206,132274,147499,139639,100931,59872,78196,116928,148495,34,7687,125793,144217,18813,121135,45003,4367,68291,38485,124775,124775,13968,111383,59132,111383,111383,111383,111383,111336,126781,58812,113446,80319,82081,111348,16088,16088,85857,47657,101772,119893,80308,66341,131865,76780,21132,57419,27882,140433,27621,50466,71690,88951,77377,11486,33699,101755,29418,101755,101755,126275,148611,107781,24009,124527,48300,29838,30791,16004,93096,30021,82667,121718,61404,92687,140801,84770,90265,113805,77469,121913,62433,101431,17106,29419,127657,108700,41827,42629,29381,29381,144838,127702,9556,104236,123508,64847,4481,87041,135523,140923,119729,61266,137220,16237,27027,135632,78189,50954,135632,135632,135632,2705,135632,137268,135632,95,135632,128608,17237,100027,81530,148662,23911,80307,4515,57320,120051,4071,100886,7908,39711,92984,94977,36324,66413,71676,37801,118260,143918,35949,23909,73587,19102,91656,16680,20327,129861,31733,11177,77247,20348,129108,31540,137847,72994,31107,107932,66993,112019,60867,116009,135053,51829,84071,119400,57343,108964,17932,30198,117982,105933,27118,77815,124301,110171,77778,134954,107366,93581,143913,42086,68730,83055,58489,72567,952,31595,59469,53737,57577,5302,40990,68058,41849,9389,57581,32309,81637,74489,95093,20482,141333,129873,60574,69457,95061,136798,8419,88825,42217,97111,68859,69030,37884,74826,148611,124244,83066,88914,18219,106433,133895,130351,123513,91080,8121,8122,55396,121128,132696,26991,122880,107444,48724,135082,95141,117335,74627,11184,19764,51971,52664,108234,96761,61091,8466,24449,130292,124775,69020,88734,8274,27608,106402,48402,125406,23906,91631,16014,27274,19128,64688,100381,53601,23045,133600,20003,106436,83555,95229,83555,57990,30329,91343,28979,124260,84424,51785,59741,27350,112832,80888,38172,125070,108002,112640,125213,122939,138819,91820,81737,77005,29639,77042,40526,84441,31724,48216,148790,20128,67573,101911,46962,32176,52375,42662,121059,146646,105049,82566,51782,72656,16476,66441,17989,125209,4158,123598,42290,108211,126085,1,120332,22780,65320,48290,43739,6983,64200,20102,6952,74441,56482,33499,56482,135737,45018,87211,82126,46629,4000,20203,74489,44328,20251,48638,62227,70114,147214,75144,4134,113905,69028,69868,78270,68477,10744,25867,8481,129897,95253,67550,50114,101646,133656,95172,141445,52664,31615,58734,89871,123586,126178,18845,15756,2006,31615,4371,89002,126571,54453,108209,57108,57108,78260,133576,110081,78260,16824,77126,102822,51080,61690,5945,82642,129295,20809,57358,100647,2147,117454,54203,125501,81551,144496,110210,68200,113601,97435,66152,23693,129988,116100,56812,124890,27274,73298,89734,69663,8452,63488,83227,148611,37004,60570,39238,119436,4468,50095,26339,59118,111410,2006,58596,61054,129460,106233,4232,11178,1155,26223,9474,48378,1294,112947,124755,33109,100933,22610,93804,40578,113275,5350,31416,84978,131006,2814,84796,75533,63120,130231,69357,106196,126798,26609,91130,4165,117719,106202,4165,46324,64169,8454,23653,144217,122163,31347,117611,112792,95419,62592,1293,117279,119305,137569,65001,27062,98553,96922,32564,69257,53286,137835,48074,47260,8841,73086,139738,78252,28264,96838,105651,27868,77741,9356,86953,48179,39193,78489,138534,13544,55534,56238,87763,56238,73270,94095,105385,11537,123763,25651,25330,76150,66717,148799,115047,103327,145914,121894,136088,98222,65479,134054,4838,15115,81361,142171,73363,73716,73716,73716,25787,58166,123763,27982,120252,105288,84297,13650,55173,56594,18389,54600,71162,28866,128344,6160,71894,98703,26492,96959,137944,26190,135867,137944,138436,26384,118285,138436,74886,1920,102161,118629,148309,56809,9839,15234,105788,88248,149055,102602,141870,7209,105122,29258,53777,147396,84997,15046,116719,142923,131362,122215,16743,22941,22832,114055,65735,113256,97734,86228,147308,147089,86229,78488,92696,140336,91452,11439,109358,144427,44411,34257,14408,79071,65778,119665,99377,91809,3856,64071,27591,138654,50510,22051,91595,63177,101775,133410,127280,12208,95137,14864,11205,35623,53887,109631,40259,54543,52567,1301,71331,31196,141587,101925,63177,125676,80400,91809,54045,64278,98704,84719,53595,57210,124289,30213,44181,123017,7738,65802,102165,35302,145820,148114,102734,127091,47103,94696,109921,109921,110430,91965,84032,87491,140318,128779,110430,1,1,65086,113864,51976,104190,19154,71546,144700,121204,121204,108423,124289,53700,115182,81313,130282,11247,139147,7534,12768,11625,38903,91809,71318,71318,25954,47828,89875,96471,49317,131027,127890,59162,15546,132111,58349,38562,114576,121713,145725,103740,5247,78397,22352,129220,116258,136677,105343,114055,28631,74699,24557,24588,90952,26518,101343,118546,66906,39029,36226,56916,117275,8076,133114,26992,38280,2662,138859,47404,142032,149157,117498,5639,45397,139199,78488,16414,140069,140069,140069,140069,140069,13918,36226,138534,76012,114650,101558,78489,78488,78488,99531,35763,127623,61420,127623,99531,127623,35763,21654,139977,72977,106702,43943,73163,77743,91388,21169,78488,81674,27228,8850,60893,27134,58969,26788,33445,118023,118023,118023,89875,121649,86427,63029,101486,82858,67841,102483,86434,86434,86434,145224,86434,98220,142528,102316,51232,90986,2327,76880,94697,90222,142111,144746,99297,42370,53595,140246,82920,109137,69466,7054,13915,13915,13915,51399,3621,77598,77598,83639,16743,11626,26458,126263,44210,114817,54640,21844,121713,135361,29600,24044,23938,67136,76078,53297,12476,103473,32833,145141,16670,82196,72456,93432,45036,128638,122563,19468,119141,76548,92829,97469,61168,102414,146187,128641,97464,71656,122565,118852,117054,11773,71976,147536,147611,5818,53854,118892,128227,146499,119206,79982,136465,139577,69341,89649,11772,38338,120313,106903,37489,23532,131813,131811,78953,12169,23794,41219,113146,120023,124032,134163,106929,44717,123374,32578,138461,124962,131933,28273,95972,125048,13894,45733,136231,128898,35365,99444,39890,97632,85537,148743,23939,127344,28455,63611,84173,45259,125048,123251,139631,1,101402,128227,63050,3409,23734,114543,1662,23186,56854,65525,118011,70944,104188,94142,143230,90528,23498,71579,133516,109577,114861,24077,126052,51308,24111,109737,148731,125048,141755,44504,18905,114461,145536,53721,34593,98423,86060,143977,145579,79645,2481,43394,8718,93046,53020,9910,129811,9534,68768,68768,36485,138214,48229,61132,135237,113940,147147,31830,86507,12549,49541,7355,87398,14617,23101,133516,34518,44771,72452,91596,51350,69896,121772,62491,4216,45818,128134,85294,23098,37986,63132,22146,80581,112346,121374,144962,143814,105490,36345,32024,137911,72727,72727,36767,140011,126402,126402,35063,56247,117561,103720,77417,127058,123046,79584,93964,1,127641,120374,88059,88059,61591,125140,2437,91008,140858,125190,97729,25005,54396,18333,91597,103935,80323,63675,90889,68781,141833,70655,32293,103466,145525,86802,22626,13410,24007,12692,88624,143219,28914,26896,70350,102515,3895,119418,137349,105606,42474,57017,63156,43241,20588,52998,61886,108811,121836,118124,135719,102594,17945,69774,41219,45378,129303,123374,52975,47776,75951,56222,29525,113674,85464,85465,79026,127274,43296,102169,21869,126280,97603,42914,24630,139551,85569,21709,133140,1,61136,134115,29525,136527,77092,142127,22440,143078,116563,125489,78837,7070,97337,82627,51003,34541,14033,73302,13997,133700,128124,123046,61676,132221,36797,94217,96446,7863,133653,115304,94149,149449,123037,119331,104691,14468,98190,23356,85673,134571,45023,106088,103842,134571,134571,125658,125658,125658,125658,125658,148967,6449,73854,140281,54246,136550,63433,141800,15266,40733,93690,71328,100529,26130,41099,139733,64594,149225,5823,111992,58387,105124,90244,131635,114328,23098,9984,43333,32818,62855,131241,55368,149225,148793,104578,42293,69619,32365,28232,28232,35983,67973,32294,121781,66411,90541,97963,140683,111868,78121,86214,40128,25633,91991,121039,77540,147937,11737,88650,91380,16977,103067,7468,104919,38087,33560,32860,122200,53033,98528,2387,99609,44189,22891,84259,71465,59481,10130,1393,1,94673,145339,28232,90377,40923,42463,125560,122581,104452,67493,90108,85417,63581,8657,13833,25366,13834,60059,78178,29428,103345,65672,54743,142759,83788,117637,44942,111877,122142,148967,146756,35061,22428,127416,110956,99794,120178,57173,39781,55245,90036,99697,50091,29527,29526,4682,75737,11771,121072,146599,37047,70534,149144,83828,109064,23475,14161,125471,65649,44770,118528,124058,40823,86315,145388,20870,63156,1701,78357,118054,36989,121829,18164,84870,130735,28075,118471,71579,63384,81324,3139,33251,126244,134131,73228,98190,44472,25005,97633,136190,23340,107697,123986,125862,79048,102515,136355,59464,88587,118334,109828,108805,123078,50365,114808,20697,33345,35462,33560,122200,8844,11724,98117,46547,114152,101661,66351,83464,20727,115622,10391,70862,124138,125142,26036,129883,21323,121067,147081,63016,128780,46547,8844,12928,50202,39276,17534,100529,47793,142387,87463,34615,44750,14616,54246,63575,62510,25021,21942,71822],  
+46.	      180, false  
+47.	      ));  
+48.	  
+49.	/*Join roads_vertices_pgr with ddistance to get the geometry of the points*/  
+50.	CREATE TABLE isopoints AS (SELECT from_v, node, cost, the_geom  
+51.	    FROM roads_vertices_pgr  
+52.	    INNER JOIN ddistance  
+53.	    ON roads_vertices_pgr.id=ddistance.node);  
+54.	  
+55.	/* Create index table*/   
+56.	CREATE TABLE public.indice(gid integer, "name" character varying)   
+57.	    WITH (OIDS = FALSE);  
+58.	      
+59.	/* create table of deleted vertices */  
+60.	CREATE TABLE public.delvertex(gid bigint)   
+61.	    WITH (OIDS = FALSE);  
+62.	  
+63.	/* Create several tables of vertices (points xy) that form the different isocrones in a "driving distance" of 180 m*/  
+64.	CREATE OR REPLACE FUNCTION isovertex() returns void as  
+65.	$BODY$  
+66.	    declare  
+67.	    vertex record;  
+68.	    -- secteur geometry ;  
+69.	    begin  
+70.	        raise notice 'calculating...';  
+71.	        for vertex in select from_v from isopoints group by from_v order by from_v ASC   
+72.	        loop   
+73.	            begin  
+74.	                raise notice 'Processing node:  %', vertex.from_v ;  
+75.	                execute 'CREATE TABLE iso_'||vertex.from_v||' as (SELECT x,y FROM pgr_alphaShape(  
+76.	                ''SELECT node::int4 as id, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y   
+77.	                  FROM isopoints WHERE isopoints.from_v = '||vertex.from_v||' ''))';  
+78.	                execute 'ALTER TABLE iso_'||vertex.from_v||' ADD id SERIAL';  
+79.	                execute 'ALTER TABLE iso_'||vertex.from_v||' ADD COLUMN the_geom public.geometry';  
+80.	                execute 'UPDATE iso_'||vertex.from_v||' SET the_geom =  ST_MakePoint(x,y)';  
+81.	                execute 'INSERT INTO indice (gid) VALUES ('||vertex.from_v||')';  
+82.	                exception     
+83.	                    when SQLstate 'XX000' then   
+84.	                    execute 'DELETE FROM isopoints  WHERE from_v = '||vertex.from_v||'';  
+85.	                    execute 'INSERT INTO delvertex (gid) VALUES ('||vertex.from_v||')';  
+86.	            end;  
+87.	        end loop;  
+88.	        return ;  
+89.	    end  
+90.	$BODY$  
+91.	Language 'plpgsql' ;  
+92.	SELECT * FROM isovertex();  
+93.	  
+94.	/* eliminate nulls*/   
+95.	CREATE OR REPLACE FUNCTION valnull() returns void as  
+96.	$BODY$  
+97.	    declare  
+98.	    riga record;  
+99.	    -- secteur geometry ;  
+100.	    begin  
+101.	        for riga in select gid from indice   
+102.	            loop   
+103.	                execute 'DELETE FROM i_'||riga.gid||'  WHERE x is null';  
+104.	            end loop;  
+105.	        return ;  
+106.	    end  
+107.	      
+108.	$BODY$  
+109.	Language 'plpgsql' ;  
+110.	SELECT * FROM valnull();  
+111.	  
+112.	/* Draws all alpha shape around given set of points in a unique table*/   
+113.	CREATE TABLE public.isocrone(geom public.geometry)   
+114.	WITH (OIDS = FALSE);  
+115.	  
+116.	  
+117.	CREATE OR REPLACE FUNCTION isocrone() returns void as  
+118.	$BODY$  
+119.	    declare  
+120.	    riga record;  
+121.	    begin  
+122.	        for riga in select gid from indice   
+123.	        loop   
+124.	            execute 'INSERT INTO isocrone SELECT pgr_pointsAsPolygon(''SELECT id::int4, ST_X(the_geom)::float8 AS x, ST_Y(the_geom)::float8 AS y FROM iso_'||riga.gid||''')';  
+125.	        end loop;  
+126.	    return ;  
+127.	end  
+128.	$BODY$  
+129.	Language 'plpgsql' ;  
+130.	SELECT * FROM isocrone();  
+131.	  
+132.	/*Join roads_vertices_pgr with indice to get the geometry of the points*/  
+133.	CREATE TABLE dae_iso AS (SELECT id, the_geom  
+134.	    FROM roads_vertices_pgr  
+135.	    INNER JOIN indice  
+136.	    ON roads_vertices_pgr.id=indice.gid);  
+137.	  
+138.	/*Join roads_vertices_pgr with indice to get the geometry of the points*/  
+139.	CREATE TABLE eliminati AS (SELECT id, the_geom  
+140.	    FROM roads_vertices_pgr  
+141.	    INNER JOIN delvertex  
+142.	    ON roads_vertices_pgr.id=delvertex.gid);  
 
 
 
